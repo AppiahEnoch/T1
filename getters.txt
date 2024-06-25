@@ -1,0 +1,27 @@
+def saveValues(**kwargs):
+    HOME_DIR = os.path.expanduser('~')
+    APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
+    DATABASE_FILENAME = 'shs.db'
+    DATABASE_FILE = os.path.join(APP_DIR, DATABASE_FILENAME)
+    REPORT_DIR = APP_DIR
+    
+    # Ensure the report directory exists
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    
+    # Save JSON file to the report directory
+    filename = os.path.join(REPORT_DIR, 'student_data.json')
+    
+    with open(filename, 'w') as json_file:
+        json.dump(kwargs, json_file)
+
+def getValues(key):
+    HOME_DIR = os.path.expanduser('~')
+    APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
+    filename = os.path.join(APP_DIR, 'student_data.json')
+    
+    if os.path.exists(filename):
+        with open(filename, 'r') as json_file:
+            data = json.load(json_file)
+            return data.get(key, None)
+    else:
+        return None

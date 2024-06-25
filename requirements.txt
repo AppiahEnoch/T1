@@ -1,0 +1,15 @@
+ttkbootstrap
+openpyxl
+pandas
+fpdf
+reportlab
+typeguard
+
+requests
+tkcalendar
+Pillow
+colorama
+tabulate
+bcrypt
+pycryptodome
+python-dateutil
