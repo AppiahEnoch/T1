@@ -95,15 +95,39 @@ def delete_all_from_computed_assessment():
     cursor.execute('DELETE FROM computed_assessment')
     conn.commit()
     conn.close()
-    
-
-
-
 def compute_and_store_assessments():
-    create_temp_table()
-    delete_all_from_computed_assessment()
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Add programme_id column to computed_assessment if it doesn't exist
+    cursor.execute("PRAGMA table_info(computed_assessment)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'programme_id' not in columns:
+        cursor.execute('ALTER TABLE computed_assessment ADD COLUMN programme_id INTEGER')
+
+    # Fetch all records from assessment table that are not in computed_assessment or have been updated
+    cursor.execute('''
+        SELECT a.student_id, a.class_id, a.semester_id, a.subject_id, a.year, 
+               a.class_score, a.exam_score, a.teacher_initial_letters, a.programme_id,
+               s.is_core AS isCore, s.short_name
+        FROM assessment a
+        JOIN subject s ON a.subject_id = s.id
+        LEFT JOIN computed_assessment ca ON a.student_id = ca.student_id 
+            AND a.class_id = ca.class_id 
+            AND a.semester_id = ca.semester_id 
+            AND a.subject_id = ca.subject_id 
+            AND a.year = ca.year
+            AND a.programme_id = ca.programme_id
+        WHERE ca.student_id IS NULL OR a.last_updated > ca.last_updated
+    ''')
+    
+    rows = cursor.fetchall()
+    print(f"Processing {len(rows)} records...")
+
+    if len(rows) == 0:
+        print("No new or updated records. Skipping computation.")
+        conn.close()
+        return
 
     # Retrieve the percentage values
     cursor.execute('SELECT class_score, exam_score FROM score_percentage WHERE id = 1')
@@ -114,33 +138,20 @@ def compute_and_store_assessments():
     class_score_percentage = float(percentage_values['class_score'])
     exam_score_percentage = float(percentage_values['exam_score'])
 
-    cursor.execute('''
-        SELECT a.student_id, a.class_id, a.semester_id, a.subject_id, a.year, 
-               a.class_score, a.exam_score, a.teacher_initial_letters,
-               s.is_core AS isCore, s.short_name
-        FROM assessment a
-        JOIN subject s ON a.subject_id = s.id
-        WHERE EXISTS (
-            SELECT 1
-            FROM class_programme_subject cps
-            WHERE cps.class_id = a.class_id
-            AND cps.subject_id = a.subject_id
-            AND cps.programme_id = a.programme_id
-        )
-    ''')
-
-    rows = cursor.fetchall()
     student_scores = {}
+    subject_scores = {}
     for row in rows:
         student_id = row['student_id']
-        if student_id not in student_scores:
-            student_scores[student_id] = {
-                'class_id': row['class_id'],
-                'semester_id': row['semester_id'],
-                'year': row['year'],
+        subject_id = row['subject_id']
+        class_id = row['class_id']
+        semester_id = row['semester_id']
+        year = row['year']
+        programme_id = row['programme_id']
+        
+        key = (student_id, class_id, semester_id, year, programme_id)
+        if key not in student_scores:
+            student_scores[key] = {
                 'subjects': [],
-                'total_score': 0,
-                'subject_count': 0
             }
 
         try:
@@ -148,61 +159,72 @@ def compute_and_store_assessments():
             exam_score = str(row['exam_score']).strip()
 
             if class_score == 'N/A' or exam_score == 'N/A':
-                # Handle N/A scores
                 weighted_class_score = weighted_exam_score = subject_total_score = 'N/A'
             else:
                 class_score = float(class_score or 0)
                 exam_score = float(exam_score or 0)
 
-                # Ensure scores are within valid range (0-100)
                 class_score = max(0, min(100, class_score))
                 exam_score = max(0, min(100, exam_score))
 
                 weighted_class_score = round(class_score * class_score_percentage / 100.0, 1)
                 weighted_exam_score = round(exam_score * exam_score_percentage / 100.0, 1)
-                subject_total_score = round(weighted_class_score + weighted_exam_score, 1)
+                subject_total_score = min(100, round(weighted_class_score + weighted_exam_score, 1))
 
-                # Ensure subject total score doesn't exceed 100
-                subject_total_score = min(100, subject_total_score)
-
-                student_scores[student_id]['total_score'] += subject_total_score
-                student_scores[student_id]['subject_count'] += 1
-
-            student_scores[student_id]['subjects'].append({
-                'subject_id': row['subject_id'],
+            subject_data = {
+                'student_id': student_id,
+                'subject_id': subject_id,
                 'class_score': weighted_class_score,
                 'exam_score': weighted_exam_score,
                 'subject_total_score': subject_total_score,
                 'isCore': row['isCore'],
                 'teacher_initial_letters': row['teacher_initial_letters'],
                 'short_name': row['short_name']
-            })
-        except ValueError as e:
-            print(f"Error processing scores for student {student_id}, subject {row['subject_id']}: {e}")
+            }
+            student_scores[key]['subjects'].append(subject_data)
+            
+            subject_key = (subject_id, class_id, semester_id, year, programme_id)
+            if subject_key not in subject_scores:
+                subject_scores[subject_key] = []
+            subject_scores[subject_key].append((student_id, subject_total_score))
 
-    # Begin to insert into computed_assessment only if valid combinations exist
-    for student_id, data in student_scores.items():
+        except ValueError as e:
+            print(f"Error processing scores for student {student_id}, subject {subject_id}: {e}")
+
+    # Calculate subject rankings
+    for subject_key, scores in subject_scores.items():
+        valid_scores = [(student_id, score) for student_id, score in scores if score != 'N/A']
+        valid_scores.sort(key=lambda x: x[1], reverse=True)
+        rankings = {student_id: str(rank) for rank, (student_id, _) in enumerate(valid_scores, 1)}
+        
+        for key, data in student_scores.items():
+            for subject in data['subjects']:
+                if (subject['subject_id'],) + key[1:] == subject_key:
+                    subject['rank'] = rankings.get(subject['student_id'], 'N/A')
+
+    # Use INSERT OR REPLACE to handle potential duplicates and updates
+    for key, data in student_scores.items():
+        student_id, class_id, semester_id, year, programme_id = key
         for subject in data['subjects']:
             subject_total_score = subject['subject_total_score']
 
-            # Determine the grade, number equivalence, and remarks based on the total score
             grade = determine_grade(subject_total_score)
             number_equivalence = assign_number(grade)
             remarks = determine_remarks(subject_total_score)
 
             cursor.execute('''
-                INSERT INTO computed_assessment (student_id, class_id, semester_id, subject_id, year, class_score, exam_score, total_score, grade, number_equivalence, remarks, isCore, teacher_initial_letters, short_name)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (student_id, data['class_id'], data['semester_id'], subject['subject_id'], data['year'], subject['class_score'], subject['exam_score'], subject_total_score, grade, number_equivalence, remarks, subject['isCore'], subject['teacher_initial_letters'], subject['short_name']))
+                INSERT OR REPLACE INTO computed_assessment 
+                (student_id, class_id, semester_id, subject_id, year, programme_id, class_score, exam_score, 
+                total_score, grade, number_equivalence, remarks, isCore, teacher_initial_letters, short_name, rank, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (student_id, class_id, semester_id, subject['subject_id'], year, programme_id,
+                  subject['class_score'], subject['exam_score'], subject_total_score, grade,
+                  number_equivalence, remarks, subject['isCore'], subject['teacher_initial_letters'],
+                  subject['short_name'], subject['rank']))
 
     conn.commit()
-    conn.close()
-
     print("Assessment computation and storage completed.")
-
-
-
-
+    conn.close() 
 def get_student_aggregate(student_id, class_id, semester_id, year):
     conn = get_db_connection()
     cursor = conn.cursor()

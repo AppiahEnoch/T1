@@ -153,7 +153,7 @@ def update_student_programme():
 
         if programme_name:
             programme_name = programme_name[0]
-            print(f"Student ID: {student_id}, Programme Name: {programme_name}")
+            # print(f"Student ID: {student_id}, Programme Name: {programme_name}")
             # Update the prog column of the student table with the programme name if it is NULL or empty
             cursor.execute('''
                 UPDATE student 
@@ -179,6 +179,7 @@ def reset_guardian_title():
 
     # Commit the changes
     conn.commit()
+    print("Guardian titles reset successfully.")
     conn.close()
 
 def delete_invalid_assessment_records():
@@ -199,26 +200,98 @@ def delete_invalid_assessment_records():
 
     # Commit the changes
     conn.commit()
+    print("Deleted assessment records removed successfully.")
     conn.close()
 
 
-def validate_and_cleanup_assessments():
+
+import sqlite3
+
+def delete_invalid_assessment_records():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Query to check and delete invalid assessment records
+    batch_size = 10000  # Adjust based on your system's capabilities
+    total_deleted = 0
+
+    try:
+        # SQLite automatically starts a transaction when needed
+        while True:
+            # Find all subject_id and class_id combinations in computed_assessment
+            # that don't exist in assessment
+            cursor.execute('''
+                SELECT DISTINCT ca.subject_id, ca.class_id
+                FROM computed_assessment ca
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM assessment a
+                    WHERE a.subject_id = ca.subject_id
+                    AND a.class_id = ca.class_id
+                )
+                LIMIT ?
+            ''', (batch_size,))
+
+            invalid_combinations = cursor.fetchall()
+
+            if not invalid_combinations:
+                break  # No more invalid combinations
+
+            # Delete the invalid records
+            placeholders = ','.join(['(?,?)'] * len(invalid_combinations))
+            flat_list = [item for sublist in invalid_combinations for item in sublist]
+            
+            cursor.execute(f'''
+                DELETE FROM computed_assessment
+                WHERE (subject_id, class_id) IN ({placeholders})
+            ''', flat_list)
+
+            deleted_count = cursor.rowcount
+            total_deleted += deleted_count
+
+            # Commit the batch
+            conn.commit()
+
+            print(f"Deleted {deleted_count} records with invalid subject_id and class_id combinations in this batch.")
+
+            if len(invalid_combinations) < batch_size:
+                break  # Last batch processed
+
+        print(f"Total deleted records: {total_deleted}")
+
+    except sqlite3.Error as e:
+        print(f"An SQLite error occurred: {e}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    finally:
+        conn.close()
+
+
+def update_student_boarding_and_house():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Update status to 'BOARDING' where it's NULL
     cursor.execute('''
-        DELETE FROM computed_assessment
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM class_programme_subject
-            WHERE class_programme_subject.class_id = computed_assessment.class_id
-            AND class_programme_subject.subject_id = computed_assessment.subject_id
-        )
+        UPDATE student
+        SET status = 'BOARDING'
+        WHERE status IS NULL
     ''')
 
-    # Commit the changes to the database
-    conn.commit()
-    conn.close()
+    # Get the least house_id
+    cursor.execute('SELECT MIN(id) FROM house')
+    least_house_id = cursor.fetchone()[0]
 
-    print("Invalid assessment records removed successfully.")
+    if least_house_id is not None:
+        # Update house_id to the least id where it's NULL
+        cursor.execute('''
+            UPDATE student
+            SET house_id = ?
+            WHERE house_id IS NULL
+        ''', (least_house_id,))
+
+    # Commit the changes
+    conn.commit()
+    print("Student boarding status and house_id updated successfully.")
+    conn.close()

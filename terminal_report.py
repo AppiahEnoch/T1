@@ -214,15 +214,16 @@ def get_school_details():
     conn.close()
     return record
 
-def get_student_assessment(student_id):
+
+def get_student_assessment(student_id, class_id, semester_id, year):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT  ca.subject_id, ca.class_score, ca.exam_score, ca.total_score, ca.grade, ca.number_equivalence, ca.remarks, ca.isCore, ca.teacher_initial_letters, ca.rank, p.subject_name
+        SELECT ca.subject_id, ca.class_score, ca.exam_score, ca.total_score, ca.grade, ca.number_equivalence, ca.remarks, ca.isCore, ca.teacher_initial_letters, ca.rank, p.subject_name
         FROM computed_assessment ca
         LEFT JOIN subject p ON ca.subject_id = p.id
-        WHERE ca.student_id = ? AND ca.total_score > 0
-    ''', (student_id,))
+        WHERE ca.student_id = ? AND ca.class_id = ? AND ca.semester_id = ? AND ca.year = ? AND ca.total_score > 0
+    ''', (student_id, class_id, semester_id, year))
     records = cursor.fetchall()
     conn.close()
     return records
@@ -593,7 +594,13 @@ class PDF(FPDF):
         self.ln(cell_height * 2)
 
         self.set_font('Arial', '', 10)
-        records = get_student_assessment(student_id)
+        
+        class_id = getValues("class_id")
+        semester_id = getValues("semester_id")
+        year = getValues("year")
+    
+        print("Class ID: ", class_id, "Semester ID: ", semester_id, "Year: ", year)
+        records = get_student_assessment(student_id, class_id, semester_id, year)
 
         core_subjects = [record for record in records if record["isCore"] == 1]
         elective_subjects = [record for record in records if record["isCore"] == 0]

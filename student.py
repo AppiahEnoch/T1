@@ -22,7 +22,7 @@ from dateutil.parser import parse
 import db
 from GS import get_preferred_class
 import multiprocessing
-
+import LCS
 class SafeMultiprocessingUpdate:
     def __init__(self):
         self.process = None
@@ -421,6 +421,8 @@ class Student:
                 conn.commit()
                 conn.close()
                 self.update_table()
+                LCS.update_student_boarding_and_house()
+                
                 messagebox.showinfo("Success", "Student details updated successfully")
             else:
                 messagebox.showerror("Error", "House name not found")

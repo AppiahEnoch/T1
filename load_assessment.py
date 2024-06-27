@@ -14,6 +14,7 @@ import LCS
 from THREAD import *
 from set_class import SetClass
 from GS import get_preferred_class
+from datetime import datetime
 
 HOME_DIR = os.path.expanduser('~')
 APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
@@ -149,12 +150,11 @@ class LoadAssessment:
         self.calculate_button.config(state="disabled")
         
         def run_calculation():
-            with multiprocessing.Pool(processes=5) as pool:
-                pool.apply_async(LCS.update_student_programme)
-                pool.apply_async(compute_and_store_assessments)
+            compute_and_store_assessments()
+            LCS.delete_invalid_assessment_records()
+            with multiprocessing.Pool(processes=3) as pool:
+                pool.apply_async(LCS.update_student_programme())
                 pool.apply_async(LCS.reset_guardian_title())
-                pool.apply_async(LCS.delete_invalid_assessment_records())
-                pool.apply_async(LCS.validate_and_cleanup_assessments())
                 pool.close()
                 pool.join()
             
@@ -182,11 +182,14 @@ class LoadAssessment:
         conn.close()
         return row['id'] if row else None
 
+    from datetime import datetime 
+
     def generate_years(self):
-        current_year = datetime.datetime.now().year
+        current_year = datetime.now().year
         start_year = 1991
         end_year = current_year + 1
         return [f"{year}/{year + 1}" for year in range(end_year, start_year - 1, -1)]
+
 
     def upload_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
@@ -360,6 +363,8 @@ class LoadAssessment:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to delete records: {e}")
 
+    from datetime import datetime
+
     def submit(self):
         try:
             conn = get_db_connection()
@@ -368,14 +373,28 @@ class LoadAssessment:
                 messagebox.showwarning("Input Error", "Please select Year, Class, subject, Semester, and Teacher Initials.")
                 return
             
+            current_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             for row in self.table_data:
                 programme_id = self.getProgrammeIDFromClassName(self.class_var.get())
                 cursor.execute('''
-                    INSERT INTO assessment (student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO assessment (
+                        student_id, semester_id, programme_id, subject_id, class_id, year, 
+                        class_score, exam_score, teacher_initial_letters, last_updated
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(student_id, semester_id, subject_id, class_id)
-                    DO UPDATE SET class_score=excluded.class_score, exam_score=excluded.exam_score, teacher_initial_letters=excluded.teacher_initial_letters
-                ''', (row["Student ID"], self.semester_var.get(), programme_id, self.subject_names[self.subject_var.get()], self.class_names[self.class_var.get()], self.year_var.get(), row["Class Score"], row["Exam Score"], self.teacher_initial_letters_var.get()))
+                    DO UPDATE SET 
+                        class_score = excluded.class_score, 
+                        exam_score = excluded.exam_score, 
+                        teacher_initial_letters = excluded.teacher_initial_letters,
+                        last_updated = excluded.last_updated
+                ''', (
+                    row["Student ID"], self.semester_var.get(), programme_id, 
+                    self.subject_names[self.subject_var.get()], self.class_names[self.class_var.get()], 
+                    self.year_var.get(), row["Class Score"], row["Exam Score"], 
+                    self.teacher_initial_letters_var.get(), current_timestamp
+                ))
             
             conn.commit()
             
@@ -426,6 +445,7 @@ class LoadAssessment:
         finally:
             conn.close()
             self.file_path.set("No file selected")
+
 
     def populate_class_names(self):
         conn = get_db_connection()

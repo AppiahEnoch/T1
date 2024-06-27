@@ -824,17 +824,14 @@ def update_student_table():
 
 
 
-
+import os
+import json
 
 def setVersion(new_version):
     # Define paths within the function
-    HOME_DIR = os.path.expanduser('~')
-    APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
-    VERSION_FILE = os.path.join(APP_DIR, 'version.json')
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    VERSION_FILE = os.path.join(SCRIPT_DIR, 'version.json')
 
-    # Ensure the directory exists
-    os.makedirs(APP_DIR, exist_ok=True)
-    
     # Initialize version_info
     version_info = {'old_version': None, 'new_version': new_version}
 
@@ -854,9 +851,8 @@ def setVersion(new_version):
 
 def getVersion():
     # Define paths within the function
-    HOME_DIR = os.path.expanduser('~')
-    APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
-    VERSION_FILE = os.path.join(APP_DIR, 'version.json')
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    VERSION_FILE = os.path.join(SCRIPT_DIR, 'version.json')
 
     # Check if the version file exists
     if os.path.exists(VERSION_FILE):
@@ -879,6 +875,7 @@ def getVersion():
         # If the file does not exist, create it and initialize version to "1.0"
         setVersion('1.0')
         return 1  # File created for the first time
+
 
 
 def drop_subject():
@@ -1376,9 +1373,172 @@ def create_indexes():
 # Call this function to create the indexes
 
 
+def alter_assessment_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Rename the existing assessment table
+    cursor.execute('ALTER TABLE assessment RENAME TO old_assessment')
+
+    # Create the new assessment table with the last_updated column
+    cursor.execute('''
+        CREATE TABLE assessment (
+            student_id INTEGER NOT NULL,
+            semester_id INTEGER NOT NULL,
+            programme_id INTEGER NOT NULL,
+            subject_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            year VARCHAR(9) NOT NULL,
+            class_score DECIMAL(5,2) NOT NULL,
+            exam_score DECIMAL(5,2) NOT NULL,
+            teacher_initial_letters TEXT DEFAULT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (student_id, semester_id, subject_id, class_id),
+            FOREIGN KEY (class_id) REFERENCES class_name(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (subject_id) REFERENCES subject(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE CASCADE ON UPDATE CASCADE
+        )
+    ''')
+
+    # Copy data from the old assessment table to the new assessment table
+    cursor.execute('''
+        INSERT INTO assessment (student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters)
+        SELECT student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters
+        FROM old_assessment
+    ''')
+
+    # Drop the old assessment table
+    cursor.execute('DROP TABLE old_assessment')
+
+    conn.commit()
+    conn.close()
+
+    print("Assessment table altered to add last_updated column.")
+
+# Function to create the assessment table if it doesn't exist
+def create_assessment_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS assessment (
+            student_id INTEGER NOT NULL,
+            semester_id INTEGER NOT NULL,
+            programme_id INTEGER NOT NULL,
+            subject_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            year VARCHAR(9) NOT NULL,
+            class_score DECIMAL(5,2) NOT NULL,
+            exam_score DECIMAL(5,2) NOT NULL,
+            teacher_initial_letters TEXT DEFAULT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (student_id, semester_id, subject_id, class_id),
+            FOREIGN KEY (class_id) REFERENCES class_name(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (subject_id) REFERENCES subject(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE CASCADE ON UPDATE CASCADE
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+    print("Assessment table created or already exists.")
+
+def alter_computed_assessment_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Rename the existing computed_assessment table
+    cursor.execute('ALTER TABLE computed_assessment RENAME TO old_computed_assessment')
+
+    # Create the new computed_assessment table with the last_updated column
+    cursor.execute('''
+        CREATE TABLE computed_assessment (
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            semester_id INTEGER NOT NULL,
+            subject_id INTEGER NOT NULL,
+            year VARCHAR(9) NOT NULL,
+            class_score DECIMAL(5,2) NOT NULL,
+            exam_score DECIMAL(5,2) NOT NULL,
+            total_score DECIMAL(5,2) NOT NULL,
+            grade TEXT,
+            number_equivalence INTEGER,
+            remarks TEXT,
+            isCore INTEGER NOT NULL,
+            teacher_initial_letters TEXT,
+            rank TEXT,
+            short_name TEXT,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (student_id, semester_id, subject_id, class_id, year)
+        )
+    ''')
+
+    # Copy data from the old computed_assessment table to the new computed_assessment table
+    cursor.execute('''
+        INSERT INTO computed_assessment (student_id, class_id, semester_id, subject_id, year, class_score, exam_score, total_score, grade, number_equivalence, remarks, isCore, teacher_initial_letters, rank, short_name)
+        SELECT student_id, class_id, semester_id, subject_id, year, class_score, exam_score, total_score, grade, number_equivalence, remarks, isCore, teacher_initial_letters, rank, short_name
+        FROM old_computed_assessment
+    ''')
+
+    # Drop the old computed_assessment table
+    cursor.execute('DROP TABLE old_computed_assessment')
+
+    conn.commit()
+    conn.close()
+
+    print("Computed assessment table altered to add last_updated column.")
+
+# Function to create the computed_assessment table if it doesn't exist
+def create_computed_assessment_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS computed_assessment (
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            semester_id INTEGER NOT NULL,
+            subject_id INTEGER NOT NULL,
+            year VARCHAR(9) NOT NULL,
+            class_score DECIMAL(5,2) NOT NULL,
+            exam_score DECIMAL(5,2) NOT NULL,
+            total_score DECIMAL(5,2) NOT NULL,
+            grade TEXT,
+            number_equivalence INTEGER,
+            remarks TEXT,
+            isCore INTEGER NOT NULL,
+            teacher_initial_letters TEXT,
+            rank TEXT,
+            short_name TEXT,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (student_id, semester_id, subject_id, class_id, year)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+    print("Computed assessment table created or already exists.")
+
+# Call the functions to ensure the table is created and altered if necessary
+
+
+def delete_all_from_computed_assessment():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM computed_assessment')
+    conn.commit()
+    conn.close()
+
 
 if getVersion() == 1:
     initialize_database()
+    create_assessment_table()
+    alter_assessment_table()
+    create_computed_assessment_table()
+    alter_computed_assessment_table()
+    delete_all_from_computed_assessment()
     initialize_remark()
     update_student_table()
     insert_subjects()

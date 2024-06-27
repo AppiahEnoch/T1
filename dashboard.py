@@ -27,7 +27,7 @@ import signature
 
 
 class Dashboard:
-    def __init__(self, root, main_controller):
+    def __init__(self, root, main_controller):                                                                                                                                                                       
         self.root = root
         self.main_controller = main_controller
         self.frame = None

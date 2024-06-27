@@ -252,6 +252,7 @@ class Report:
                 self.table.delete(row)
 
             for row in self.table_data:
+                
                 self.table.insert('', 'end', values=[
                     row['student_id'],
                     row['name'],

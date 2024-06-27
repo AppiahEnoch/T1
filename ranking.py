@@ -198,7 +198,6 @@ class Ranking:
     
     
     def getRanking(self, exam_title, class_id=None, year=None, semester_id=None):
-    
         # Set directory paths
         HOME_DIR = os.path.expanduser('~')
         APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
@@ -236,6 +235,7 @@ class Ranking:
 
         cursor.execute(query, tuple(params))
         rankings = cursor.fetchall()
+        print(rankings)
         conn.close()
 
         # Function to convert position to ordinal
@@ -252,21 +252,23 @@ class Ranking:
         elective_subjects = set()
         for row in rankings:
             student_id = row['student_id']
+            subject_short_name = row['short_name']
+            
             if student_id not in student_data:
                 student_data[student_id] = {
                     'student_name': row['student_name'],
                     'subjects': {},
                     'total': 0,
                     'average': 0,
-                    'aggregate': get_student_aggregate(row['student_id'], class_id, semester_id, year),  # Calculate aggregate
+                    'aggregate': get_student_aggregate(row['student_id'], class_id, semester_id, year),
                     'position': 0
                 }
-            student_data[student_id]['subjects'][row['short_name']] = row['total_score']
+            student_data[student_id]['subjects'][subject_short_name] = row['total_score']
             student_data[student_id]['total'] += row['total_score']
             if row['isCore'] == 1:
-                core_subjects.add(row['short_name'])
+                core_subjects.add(subject_short_name)
             else:
-                elective_subjects.add(row['short_name'])
+                elective_subjects.add(subject_short_name)
 
         for student in student_data.values():
             student['average'] = round(student['total'] / len(student['subjects']), 2)
@@ -274,7 +276,7 @@ class Ranking:
         sorted_students = sorted(student_data.values(), key=lambda x: x['total'], reverse=True)
 
         for i, student in enumerate(sorted_students, 1):
-            student['position'] = ordinal(i)  # Update to use ordinal function
+            student['position'] = ordinal(i)
 
         # Arrange core subjects starting with Math, English, Science
         core_subject_order = ["MATH", "ENG", "SCI"]
@@ -370,7 +372,7 @@ class Ranking:
 
         ws.column_dimensions['A'].width = 5  # Adjust width of column A
         ws.column_dimensions['I'].width = 15
-        #Concatenate the file name
+        # Concatenate the file name
         file_name = classYearSemster.replace(" ", "_").replace("/", "_").replace(":", "_") + ".xlsx"
         # Save the file
         file_path = os.path.join(REPORT_DIR, file_name)
@@ -383,7 +385,6 @@ class Ranking:
             os.startfile(REPORT_DIR)
         elif os.name == 'posix':  # For macOS and Linux
             subprocess.call(['open', REPORT_DIR]) if sys.platform == 'darwin' else subprocess.call(['xdg-open', REPORT_DIR])
-    
 
 
  

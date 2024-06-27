@@ -35,12 +35,18 @@ def create_splash_screen():
     return splash
 
 def run_parallel_tasks():
-    with multiprocessing.Pool(processes=5) as pool:
-        pool.apply_async(LCS.update_student_programme)
-        pool.apply_async(compute_and_store_assessments)
+    
+    compute_and_store_assessments()
+    
+    # LCS.update_student_programme()
+    # LCS.reset_guardian_title()
+    #LCS.delete_invalid_assessment_records()
+    
+    with multiprocessing.Pool(processes=3) as pool:
+        pool.apply_async(LCS.update_student_programme())
         pool.apply_async(LCS.reset_guardian_title())
-        pool.apply_async(LCS.delete_invalid_assessment_records())
-        pool.apply_async(LCS.validate_and_cleanup_assessments())
+        pool.apply_async(LCS.update_student_boarding_and_house())
+        # pool.apply_async(LCS.validate_and_cleanup_assessments())
         pool.close()
         pool.join()
 
