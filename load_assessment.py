@@ -1,3 +1,4 @@
+import multiprocessing
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import filedialog
@@ -12,20 +13,12 @@ from ass import *
 import LCS
 from THREAD import *
 from set_class import SetClass
-
 from GS import get_preferred_class
-
-
-
 
 HOME_DIR = os.path.expanduser('~')
 APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
 DATABASE_FILENAME = 'shs.db'
 DATABASE_FILE = os.path.join(APP_DIR, DATABASE_FILENAME)
-
-
-
-
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_FILE)
@@ -66,8 +59,6 @@ class LoadAssessment:
         self.year_select.config(justify="center")
         self.year_select.bind("<<ComboboxSelected>>", self.on_combobox_select)
         
-        # CREATE A CONTAINER TO HOLD 3 SMALLER COMBOS, NUM1, PROG
-
         ttk.Label(self.frame, text="Select Class:", font=label_font).grid(row=0, column=2, padx=entry_padding_x, pady=entry_padding_y, sticky=E)
         self.class_var = ttk.StringVar()
         self.class_select = ttk.Combobox(self.frame, textvariable=self.class_var)
@@ -97,7 +88,6 @@ class LoadAssessment:
         self.teacher_initial_letters_var = ttk.StringVar()
         self.teacher_initial_letters_entry = ttk.Entry(self.frame, textvariable=self.teacher_initial_letters_var, font=("Helvetica", 10))
         self.teacher_initial_letters_entry.grid(row=2, column=1, padx=entry_padding_x, pady=entry_padding_y, sticky=W)
-        #SET DEFAULT VALUE
         self.teacher_initial_letters_var.set("ST")
 
         ttk.Label(self.frame, text="Upload File:", font=label_font).grid(row=2, column=2, padx=entry_padding_x, pady=entry_padding_y, sticky=E)
@@ -115,27 +105,27 @@ class LoadAssessment:
         self.submit_button = ttk.Button(button_frame, text="Submit", command=self.submit, bootstyle="success")
         self.submit_button.pack(side=LEFT, padx=button_padding_x)
         
-        #ADD CALCULATE BUTTON
-        self.calculate_button = ttk.Button(button_frame, text="Calculate", command=self.calculate, bootstyle="success")
+        self.calculate_button = ttk.Button(button_frame, text="Calculate", command=self.calculate_with_progress, bootstyle="success")
         self.calculate_button.pack(side=LEFT, padx=button_padding_x)
         
-        
-        
-        # add reset button
         self.reset_button = ttk.Button(button_frame, text="Reset", command=self.clear_all_fields_data, bootstyle="success")
         self.reset_button.pack(side=LEFT, padx=button_padding_x)
         
-
         self.delete_button = ttk.Button(button_frame, text="Delete", command=self.delete_records, bootstyle="danger")
         self.delete_button.pack(side=LEFT, padx=button_padding_x)
         
         self.export_button = ttk.Button(button_frame, text="Export To Excel", command=self.export_to_excel, bootstyle="success")
         self.export_button.pack(side=LEFT, padx=button_padding_x)
-        #button SET CLASS
+        
         self.clear_button = ttk.Button(button_frame, text="Set Class", command=self.open_set_class_window, bootstyle="success")
         self.clear_button.pack(side=LEFT, padx=button_padding_x)
-        
 
+        # Add progress bar
+        self.progress_var = ttk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(self.frame, length=200, mode='determinate', variable=self.progress_var, style="info.Horizontal.TProgressbar")
+        self.progress_bar.grid(row=5, column=0, columnspan=4, padx=entry_padding_x, pady=entry_padding_y, sticky="ew")
+        self.progress_bar.grid_remove() 
+        
         columns = ("student_id", "name", "class", "subject", "class_score", "exam_score", "teacher_initial_letters")
         self.table = tkttk.Treeview(self.frame, columns=columns, show="headings")
 
@@ -143,39 +133,41 @@ class LoadAssessment:
         hsb = tkttk.Scrollbar(self.frame, orient="horizontal", command=self.table.xview)
         self.table.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
-        self.table.grid(row=5, column=0, columnspan=4, padx=entry_padding_x, pady=entry_padding_y, sticky="nsew")
-        vsb.grid(row=5, column=4, sticky="ns")
-        hsb.grid(row=6, column=0, columnspan=4, sticky="ew")
+        self.table.grid(row=6, column=0, columnspan=4, padx=entry_padding_x, pady=entry_padding_y, sticky="nsew")
+        vsb.grid(row=6, column=4, sticky="ns")
+        hsb.grid(row=7, column=0, columnspan=4, sticky="ew")
 
-        self.frame.grid_rowconfigure(5, weight=1)
+        self.frame.grid_rowconfigure(6, weight=1)
         self.frame.grid_columnconfigure(0, weight=1)
         self.frame.grid_columnconfigure(1, weight=1)
         self.frame.grid_columnconfigure(2, weight=1)
         self.frame.grid_columnconfigure(3, weight=1)
+
+    def calculate_with_progress(self):
+        self.progress_bar.grid()  # Show progress bar
+        self.progress_bar.start(10)
+        self.calculate_button.config(state="disabled")
         
-    def clear_all_fields_data(self):
-        self.year_var.set('')
-        self.class_var.set('')
-        self.subject_var.set('')
-        self.semester_var.set('')
-        self.teacher_initial_letters_var.set('ST')
-        self.file_path.set('No file selected')
-        self.table_data = []
-        self.populate_table_from_excel()
+        def run_calculation():
+            with multiprocessing.Pool(processes=5) as pool:
+                pool.apply_async(LCS.update_student_programme)
+                pool.apply_async(compute_and_store_assessments)
+                pool.apply_async(LCS.reset_guardian_title())
+                pool.apply_async(LCS.delete_invalid_assessment_records())
+                pool.apply_async(LCS.validate_and_cleanup_assessments())
+                pool.close()
+                pool.join()
+            
+            self.root.after(0, self.finish_calculation)
         
-    def open_set_class_window(self):
-        new_window = ttk.Toplevel(self.root)
-        SetClass(new_window)
-     
-        
-        
-    def calculate(self):
-        run_in_thread(compute_and_store_assessments())
-        run_in_thread(LCS.update_student_programme())
-        # show message box
-        messagebox.showinfo("Success", "Assessment and other Records  Calculated Successfully")
-        
-        
+        self.root.after(100, run_calculation)
+
+    def finish_calculation(self):
+        self.progress_bar.stop()
+        self.progress_bar.grid_remove()  # Hide progress bar
+        self.calculate_button.config(state="normal")
+        messagebox.showinfo("Success", "Assessment and other Records Calculated Successfully")
+
     def getProgrammeIDFromClassName(self, class_name):
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -213,11 +205,9 @@ class LoadAssessment:
             if not all(column in df.columns for column in required_columns):
                 raise ValueError("Invalid file format. Please upload an Excel file with the correct format.")
 
-            # Fill NaN values in scores with 0
             df["Class Score"] = df["Class Score"].fillna(0)
             df["Exam Score"] = df["Exam Score"].fillna(0)
 
-            # Filter out rows where "Name of Student" or "Student ID" are NaN, null, or empty
             df = df.dropna(subset=["Name of Student", "Student ID"])
             df = df[df["Name of Student"].astype(bool) & df["Student ID"].astype(bool)]
 
@@ -227,7 +217,6 @@ class LoadAssessment:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load Excel file: {e}")
 
-   
     def export_to_excel(self):
         try:
             formatted_data = [
@@ -287,7 +276,6 @@ class LoadAssessment:
             ))
 
     def fetch_existing_data(self):
-        #print(self.year_var.get())
         conditions = []
         params = []
 
@@ -317,11 +305,11 @@ class LoadAssessment:
             '''
             try:
                 conn = get_db_connection()
-                conn.execute('PRAGMA foreign_keys = ON')  # Ensure foreign keys are enabled
-                conn.execute('PRAGMA synchronous = OFF')  # Speed up by not waiting for data to be written to disk
-                conn.execute('PRAGMA journal_mode = MEMORY')  # Use memory for journal to speed up
-                conn.execute('PRAGMA temp_store = MEMORY')  # Store temporary tables in memory
-                conn.execute('PRAGMA optimize')  # Run PRAGMA optimize to optimize the database
+                conn.execute('PRAGMA foreign_keys = ON')
+                conn.execute('PRAGMA synchronous = OFF')
+                conn.execute('PRAGMA journal_mode = MEMORY')
+                conn.execute('PRAGMA temp_store = MEMORY')
+                conn.execute('PRAGMA optimize')
 
                 cursor = conn.cursor()
                 cursor.execute(query, tuple(params))
@@ -335,7 +323,6 @@ class LoadAssessment:
             self.table_data = []
             self.populate_table_from_db()
 
-    
     def populate_table_from_db(self):
         for item in self.table.get_children():
             self.table.delete(item)
@@ -375,10 +362,8 @@ class LoadAssessment:
 
     def submit(self):
         try:
-        
             conn = get_db_connection()
             cursor = conn.cursor()
-                #CHECK  class_name, subject_name, semester_id, year, class_score, exam_score, teacher_initial_letters
             if not (self.year_var.get() and self.class_var.get() and self.subject_var.get() and self.semester_var.get() and self.teacher_initial_letters_var.get()):
                 messagebox.showwarning("Input Error", "Please select Year, Class, subject, Semester, and Teacher Initials.")
                 return
@@ -406,7 +391,6 @@ class LoadAssessment:
                     ON CONFLICT(student_id) DO NOTHING
                 ''', (student_id, name, year, class_id))
                 
-                # Check if student exists
                 cursor.execute('SELECT student_id FROM student WHERE student_id = ?', (student_id,))
                 existing_student = cursor.fetchone()
                 
@@ -435,13 +419,7 @@ class LoadAssessment:
                         ''', update_values)
 
             conn.commit()
-          
-
             messagebox.showinfo("Success", "Data submitted successfully")
-           
-            
-         
-           
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to submit data: {e}")
@@ -458,11 +436,9 @@ class LoadAssessment:
         
         class_names = list(self.class_names.keys())
 
-        # Get the preferred class filter
         preferred_class = get_preferred_class()
 
         if preferred_class:
-            # Filter class names that match the preferred class pattern
             filtered_class_names = [
                 class_name for class_name in class_names 
                 if preferred_class.lower() in class_name.lower()
@@ -470,7 +446,6 @@ class LoadAssessment:
             self.class_select["values"] = filtered_class_names
         else:
             self.class_select["values"] = class_names
-
 
     def populate_subject_names(self):
         conn = get_db_connection()
@@ -480,14 +455,11 @@ class LoadAssessment:
         conn.close()
         self.subject_select["values"] = list(self.subject_names.keys())
         
-        
     def update_subject_suggestions(self):
         selected_class = self.class_select.get()
-        #print(selected_class)
         if selected_class in self.class_names:
             class_id = self.class_names[selected_class]
             subjects = LCS.get_subjects_by_class_id(class_id)
-            #clear subject suggestions
             self.subject_select["values"] = []
             
             subject_names = [subject[0] for subject in subjects]
@@ -512,11 +484,9 @@ class LoadAssessment:
                 classes = LCS.get_classes_by_subject_id(subject_id)
                 class_names = [class_item[0] for class_item in classes]
                 
-                # Get the preferred class filter
                 preferred_class = get_preferred_class()
 
                 if preferred_class:
-                    # Filter class names that match the preferred class pattern
                     filtered_class_names = [
                         class_name for class_name in class_names 
                         if preferred_class.lower() in class_name.lower()
@@ -527,10 +497,22 @@ class LoadAssessment:
 
             conn.close()
 
-
-
     def on_combobox_select(self, event):
         self.fetch_existing_data()
+
+    def clear_all_fields_data(self):
+        self.year_var.set('')
+        self.class_var.set('')
+        self.subject_var.set('')
+        self.semester_var.set('')
+        self.teacher_initial_letters_var.set('ST')
+        self.file_path.set('No file selected')
+        self.table_data = []
+        self.populate_table_from_excel()
+        
+    def open_set_class_window(self):
+        new_window = ttk.Toplevel(self.root)
+        SetClass(new_window)
 
 if __name__ == "__main__":
     from create_table import initialize_database
@@ -538,6 +520,5 @@ if __name__ == "__main__":
 
     root = ttk.Window("Load Assessment", "darkly", resizable=(False, False))
     app = LoadAssessment(root)
-    #always on top true
     root.attributes("-topmost", False)
     root.mainloop()

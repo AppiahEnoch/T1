@@ -358,15 +358,22 @@ class PDF(FPDF):
         self.add_school_logo(school_details)
         self.add_school_info(school_details)
         self.add_report_title()
+        
+    
 
     def add_school_logo(self, school_details):
+        imageYpos = 8
+        imageSize = 25
+        imageXpos = 15
         logo_url = school_details["logo_url"]
         if logo_url and os.path.exists(logo_url):
-            self.image(logo_url, 20, 8, 30, 30)
+            self.image(logo_url, imageXpos, imageYpos, imageSize, imageSize)
+            print("Custom logo used")
         else:
             default_logo = get_default_logo_image()
             if default_logo and os.path.exists(default_logo):
-                self.image(default_logo, 20, 8, 30, 30)
+                self.image(default_logo, imageXpos, imageYpos, imageSize, imageSize)
+                print("Default logo used")
 
     def add_school_info(self, school_details):
         self.cell(0, 10, school_details["school_name"], 0, 1, 'C')

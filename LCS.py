@@ -164,3 +164,61 @@ def update_student_programme():
     # Commit the changes
     conn.commit()
     conn.close()
+
+
+def reset_guardian_title():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Update the guardian_title to NULL where it is 'BOARDING' or 'DAY' (case insensitive)
+    cursor.execute('''
+        UPDATE student
+        SET guardian_title = NULL
+        WHERE UPPER(guardian_title) IN ('BOARDING', 'DAY')
+    ''')
+
+    # Commit the changes
+    conn.commit()
+    conn.close()
+
+def delete_invalid_assessment_records():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Delete assessment records where the combination of class_id, subject_id, and programme_id does not exist in the class_programme_subject table
+    cursor.execute('''
+        DELETE FROM assessment
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM class_programme_subject
+            WHERE class_programme_subject.class_id = assessment.class_id
+            AND class_programme_subject.subject_id = assessment.subject_id
+            AND class_programme_subject.programme_id = assessment.programme_id
+        )
+    ''')
+
+    # Commit the changes
+    conn.commit()
+    conn.close()
+
+
+def validate_and_cleanup_assessments():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to check and delete invalid assessment records
+    cursor.execute('''
+        DELETE FROM computed_assessment
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM class_programme_subject
+            WHERE class_programme_subject.class_id = computed_assessment.class_id
+            AND class_programme_subject.subject_id = computed_assessment.subject_id
+        )
+    ''')
+
+    # Commit the changes to the database
+    conn.commit()
+    conn.close()
+
+    print("Invalid assessment records removed successfully.")

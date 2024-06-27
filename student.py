@@ -41,12 +41,12 @@ class SafeMultiprocessingUpdate:
         pass
 
 # Assuming GS is a global instance of SafeMultiprocessingUpdate
-GS = SafeMultiprocessingUpdate()
+GS1 = SafeMultiprocessingUpdate()
 
 
 class Student:
     def __init__(self, root):
-        GS.update_student_house()
+        GS1.update_student_house()
       
         self.root = root
         self.root.title("Student Management")
@@ -814,7 +814,7 @@ class Student:
             self.update_table()
             messagebox.showinfo("Success", "Data uploaded successfully")
             
-            GS.start_update_process()
+            GS1.start_update_process()
     
 
             # Save error-prone rows to a separate Excel file

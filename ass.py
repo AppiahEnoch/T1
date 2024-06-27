@@ -97,6 +97,8 @@ def delete_all_from_computed_assessment():
     conn.close()
     
 
+
+
 def compute_and_store_assessments():
     create_temp_table()
     delete_all_from_computed_assessment()
@@ -118,6 +120,13 @@ def compute_and_store_assessments():
                s.is_core AS isCore, s.short_name
         FROM assessment a
         JOIN subject s ON a.subject_id = s.id
+        WHERE EXISTS (
+            SELECT 1
+            FROM class_programme_subject cps
+            WHERE cps.class_id = a.class_id
+            AND cps.subject_id = a.subject_id
+            AND cps.programme_id = a.programme_id
+        )
     ''')
 
     rows = cursor.fetchall()
@@ -152,8 +161,6 @@ def compute_and_store_assessments():
                 weighted_class_score = round(class_score * class_score_percentage / 100.0, 1)
                 weighted_exam_score = round(exam_score * exam_score_percentage / 100.0, 1)
                 subject_total_score = round(weighted_class_score + weighted_exam_score, 1)
-                
-                
 
                 # Ensure subject total score doesn't exceed 100
                 subject_total_score = min(100, subject_total_score)
@@ -173,55 +180,27 @@ def compute_and_store_assessments():
         except ValueError as e:
             print(f"Error processing scores for student {student_id}, subject {row['subject_id']}: {e}")
 
-    assessments = []
+    # Begin to insert into computed_assessment only if valid combinations exist
     for student_id, data in student_scores.items():
         for subject in data['subjects']:
             subject_total_score = subject['subject_total_score']
-            
+
+            # Determine the grade, number equivalence, and remarks based on the total score
             grade = determine_grade(subject_total_score)
             number_equivalence = assign_number(grade)
             remarks = determine_remarks(subject_total_score)
-            if student_id == "BB1460":
-                print(f"Student ID: {student_id}, Subject ID: {subject['subject_id']}, Total Score: {subject_total_score}, Grade: {grade}, Number Equivalence: {number_equivalence}, Remarks: {remarks}")
-            assessments.append((
-                student_id, data['class_id'], data['semester_id'], subject['subject_id'], data['year'],
-                subject['class_score'], subject['exam_score'], subject['subject_total_score'],
-                grade, number_equivalence, remarks, subject['isCore'],
-                subject['teacher_initial_letters'], subject['short_name'], 0  # Initial rank placeholder
-            ))
 
-    # Compute ranks for each subject within the same class, semester, and year
-    df = pd.DataFrame(assessments, columns=[
-        'student_id', 'class_id', 'semester_id', 'subject_id', 'year',
-        'class_score', 'exam_score', 'total_score', 'grade', 'number_equivalence',
-        'remarks', 'isCore', 'teacher_initial_letters', 'short_name', 'rank'
-    ])
-    df['rank'] = df.groupby(['class_id', 'semester_id', 'subject_id', 'year'])['total_score'].rank(ascending=False, method='min').astype(int)
-
-    for assessment in df.itertuples(index=False):
-        student_id = assessment.student_id
-        cursor.execute('''
-            SELECT COUNT(*) FROM computed_assessment 
-            WHERE student_id = ? AND class_id = ? AND semester_id = ? AND subject_id = ? AND year = ?
-        ''', (assessment.student_id, assessment.class_id, assessment.semester_id, assessment.subject_id, assessment.year))
-        exists = cursor.fetchone()[0]
-
-        if exists:
             cursor.execute('''
-                UPDATE computed_assessment
-                SET class_score = ?, exam_score = ?, total_score = ?, grade = ?, number_equivalence = ?, remarks = ?, isCore = ?, teacher_initial_letters = ?, short_name = ?, rank = ?
-                WHERE student_id = ? AND class_id = ? AND semester_id = ? AND subject_id = ? AND year = ?
-            ''', (assessment.class_score, assessment.exam_score, assessment.total_score, assessment.grade, assessment.number_equivalence, assessment.remarks, assessment.isCore, assessment.teacher_initial_letters, assessment.short_name, assessment.rank, assessment.student_id, assessment.class_id, assessment.semester_id, assessment.subject_id, assessment.year))
-        else:
-            cursor.execute('''
-                INSERT INTO computed_assessment (student_id, class_id, semester_id, subject_id, year, class_score, exam_score, total_score, grade, number_equivalence, remarks, isCore, teacher_initial_letters, short_name, rank)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (assessment.student_id, assessment.class_id, assessment.semester_id, assessment.subject_id, assessment.year, assessment.class_score, assessment.exam_score, assessment.total_score, assessment.grade, assessment.number_equivalence, assessment.remarks, assessment.isCore, assessment.teacher_initial_letters, assessment.short_name,get_ordinal_suffix(assessment.rank)))
+                INSERT INTO computed_assessment (student_id, class_id, semester_id, subject_id, year, class_score, exam_score, total_score, grade, number_equivalence, remarks, isCore, teacher_initial_letters, short_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (student_id, data['class_id'], data['semester_id'], subject['subject_id'], data['year'], subject['class_score'], subject['exam_score'], subject_total_score, grade, number_equivalence, remarks, subject['isCore'], subject['teacher_initial_letters'], subject['short_name']))
 
     conn.commit()
     conn.close()
 
-    print("Assessment computation and update completed.")
+    print("Assessment computation and storage completed.")
+
+
 
 
 def get_student_aggregate(student_id, class_id, semester_id, year):

@@ -5,9 +5,14 @@ from tkinter import messagebox, Canvas
 import sqlite3
 import os
 import datetime
-from datetime import datetime
+import re
+# import inflect
 from fpdf import FPDF
+import os
+
+from datetime import datetime
 from GS import get_preferred_class
+
 
 def get_formatted_datetime():
     now = datetime.now()
@@ -15,6 +20,9 @@ def get_formatted_datetime():
     suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     formatted_date = now.strftime(f"{day}{suffix} %B, %Y %I:%M%p").lower()
     return formatted_date
+
+
+
 
 HOME_DIR = os.path.expanduser('~')
 APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
@@ -73,8 +81,8 @@ def get_assessment_submission_status(year=None, semester=None, class_id=None):
     WHERE
         (es.class_id = ? OR ? IS NULL)
     ORDER BY 
-        es.programme_name,
         es.class_name,
+        es.programme_name,
         year,
         semester_id,
         es.subject_name
@@ -86,44 +94,54 @@ def get_assessment_submission_status(year=None, semester=None, class_id=None):
     conn.close()
     return results
 
+
+
+
 class PDF(FPDF):
     def header(self):
-        formatted_datetime = get_formatted_datetime()
+        formatted_datetime=get_formatted_datetime()
+
+
+        
         self.set_font('Arial', 'B', 16)
         self.set_text_color(0, 0, 128)
         self.cell(0, 10, 'ASSESSMENT SUBMISSION REPORT ', 0, 1, 'C')
         self.set_font('Arial', 'I', 10)
         self.cell(0, 10, f"Generated on {formatted_datetime}", 0, 1, 'C')   
+        
+        
+        
+ 
+    
+  
         self.ln(10)
 
-    def chapter_title(self, programme_name, class_name):
+    def chapter_title(self, programme_name):
         self.set_font('Arial', 'B', 14)
         self.set_text_color(0, 102, 204)
-        self.cell(0, 10, f"{programme_name} - {class_name}", 0, 1, 'L')
+        self.cell(0, 10, programme_name, 0, 1, 'L')
         self.ln(5)
 
-    def chapter_body(self, submitted_subjects, not_submitted_subjects):
+    def chapter_body(self, existing_subjects, not_existing_subjects):
         self.set_font('Arial', 'B', 12)
-        self.set_fill_color(1, 135, 73)  # Dark Green for header
+        self.set_fill_color(1, 135, 73)  # #018749
         self.set_text_color(255, 255, 255)  # White text color
         self.cell(95, 10, 'Submitted', 1, 0, 'C', fill=True)
         self.cell(95, 10, 'Not Submitted', 1, 1, 'C', fill=True)
-        self.create_table(submitted_subjects, not_submitted_subjects)
+        self.create_table(existing_subjects, not_existing_subjects)
         self.ln(5)
 
-    def create_table(self, submitted_subjects, not_submitted_subjects):
-        self.set_fill_color(200, 230, 201)  # Light green shade for cells
+    def create_table(self, existing_subjects, not_existing_subjects):
+        self.set_fill_color(200, 230, 201)  # Light green shade
         self.set_text_color(0, 0, 0)
         self.set_font('Arial', '', 12)
-        max_len = max(len(submitted_subjects), len(not_submitted_subjects))
+        max_len = max(len(existing_subjects), len(not_existing_subjects))
         for i in range(max_len):
-            submitted_subject = submitted_subjects[i] if i < len(submitted_subjects) else ''
-            not_submitted_subject = not_submitted_subjects[i] if i < len(not_submitted_subjects) else ''
-            self.cell(95, 10, submitted_subject, 1, 0, 'L', fill=True)
-            self.cell(95, 10, not_submitted_subject, 1, 1, 'L', fill=True)
+            existing_subject = existing_subjects[i] if i < len(existing_subjects) else ''
+            not_existing_subject = not_existing_subjects[i] if i < len(not_existing_subjects) else ''
+            self.cell(95, 10, existing_subject, 1, 0, 'L', fill=True)
+            self.cell(95, 10, not_existing_subject, 1, 1, 'L', fill=True)
         self.ln(2)
-        self.set_font('Arial', 'B', 10)
-        self.cell(0, 10, f"Submitted: {len(submitted_subjects)}, Not Submitted: {len(not_submitted_subjects)}", 0, 1, 'L')
 
 def createPDF(results):
     HOME_DIR = os.path.expanduser('~')
@@ -135,15 +153,15 @@ def createPDF(results):
 
     pdf = PDF()
     pdf.add_page()
+    
 
-    for programme in results:
-        for class_data in programme['classes']:
-            pdf.chapter_title(programme['programme_name'], class_data['class_name'])
-            pdf.chapter_body(class_data['submitted_subjects'], class_data['not_submitted_subjects'])
-
+    for result in results:
+        pdf.chapter_title(result['programme_name'])
+        pdf.chapter_body(result['existing_subjects'], result['not_existing_subjects'])
     report_path = os.path.join(NOT_SUBMITTED_LIST_DIR, 'ASSESSMENT_SUBMISSION_REPORT.pdf')
     pdf.output(report_path)
     os.startfile(NOT_SUBMITTED_LIST_DIR)
+
 
 class NotSubmitted:
     def __init__(self, root):
@@ -153,8 +171,8 @@ class NotSubmitted:
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        window_width = 800
-        window_height = 600
+        window_width = 600
+        window_height = 500
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
 
@@ -169,7 +187,7 @@ class NotSubmitted:
         self.frame = ttk.Frame(self.root, padding=frame_padding)
         self.frame.pack(fill=BOTH, expand=TRUE)
 
-        ttk.Label(self.frame, text="Assessment Submission Status", font=label_font).grid(row=0, column=0, columnspan=4, padx=entry_padding_x, pady=entry_padding_y, sticky=W)
+        ttk.Label(self.frame, text="Subjects with no assessment records", font=label_font).grid(row=0, column=0, columnspan=4, padx=entry_padding_x, pady=entry_padding_y, sticky=W)
 
         ttk.Label(self.frame, text="Select Year:", font=label_font).grid(row=1, column=0, padx=entry_padding_x, pady=entry_padding_y, sticky=E)
         self.year_var = ttk.StringVar()
@@ -233,11 +251,14 @@ class NotSubmitted:
         elif event.num == 5:
             self.canvas.yview_scroll(1, "units")
 
+
+
     def generate_years(self):
         current_year = datetime.now().year
         start_year = 1991
         end_year = current_year + 1
         return [f"{year}/{year + 1}" for year in range(end_year, start_year - 1, -1)]
+
 
     def populate_class_names(self):
         conn = get_db_connection()
@@ -248,9 +269,11 @@ class NotSubmitted:
 
         class_names = list(self.class_names.keys())
 
+        # Get the preferred class filter
         preferred_class = get_preferred_class()
 
         if preferred_class:
+            # Filter class names that match the preferred class pattern
             filtered_class_names = [
                 class_name for class_name in class_names 
                 if preferred_class.lower() in class_name.lower()
@@ -258,6 +281,9 @@ class NotSubmitted:
             self.class_select["values"] = filtered_class_names
         else:
             self.class_select["values"] = class_names
+
+            
+        
 
     def update_table(self, event=None):
         year = self.year_var.get()
@@ -272,68 +298,23 @@ class NotSubmitted:
 
         if programmes_subjects:
             row = 0
+            col = 0
             for programme in programmes_subjects:
                 programme_frame = ttk.Labelframe(self.canvas_frame, text=programme["programme_name"], padding=10)
-                programme_frame.grid(row=row, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+                programme_frame.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
-                class_row = 0
-                for class_data in programme["classes"]:
-                    class_frame = ttk.Labelframe(programme_frame, text=class_data["class_name"], padding=5)
-                    class_frame.grid(row=class_row, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
+                table = tkttk.Treeview(programme_frame, columns=["subject"], show="headings")
+                table.heading("subject", text="Subjects")
+                table.column("subject", width=200, anchor=CENTER)
+                table.pack(fill=BOTH, expand=True)
 
-                    tables_frame = ttk.Frame(class_frame)
-                    tables_frame.pack(fill=BOTH, expand=True)
+                for subject in programme["not_existing_subjects"]:
+                    table.insert("", "end", values=(subject,))
 
-                    submitted_frame = ttk.Frame(tables_frame)
-                    submitted_frame.pack(side=LEFT, fill=BOTH, expand=True)
-                    ttk.Label(submitted_frame, text="Submitted Subjects", font=("Helvetica", 10, "bold")).pack()
-                    submitted_table_frame = ttk.Frame(submitted_frame)
-                    submitted_table_frame.pack(fill=BOTH, expand=True)
-                    
-                    submitted_table = tkttk.Treeview(submitted_table_frame, columns=["subject"], show="headings")
-                    submitted_table.heading("subject", text="Subject")
-                    submitted_table.column("subject", width=150, anchor=CENTER)
-                    submitted_table.pack(side=LEFT, fill=BOTH, expand=True)
-                    
-                    submitted_scrollbar = ttk.Scrollbar(submitted_table_frame, orient=VERTICAL, command=submitted_table.yview)
-                    submitted_scrollbar.pack(side=RIGHT, fill=Y)
-                    submitted_table.configure(yscrollcommand=submitted_scrollbar.set)
-                    
-                    for subject in class_data["submitted_subjects"]:
-                        submitted_table.insert("", "end", values=(subject,))
-                        submitted_table.tag_configure("submitted", foreground="gray")
-                        submitted_table.item(submitted_table.get_children()[-1], tags=("submitted",))
-
-                    not_submitted_frame = ttk.Frame(tables_frame)
-                    not_submitted_frame.pack(side=RIGHT, fill=BOTH, expand=True)
-                    ttk.Label(not_submitted_frame, text="Not Submitted Subjects", font=("Helvetica", 10, "bold")).pack()
-                    
-                    not_submitted_table_frame = ttk.Frame(not_submitted_frame)
-                    not_submitted_table_frame.pack(fill=BOTH, expand=True)
-                    
-                    not_submitted_table = tkttk.Treeview(not_submitted_table_frame, columns=["subject"], show="headings")
-                    not_submitted_table.heading("subject", text="Subject")
-                    not_submitted_table.column("subject", width=150, anchor=CENTER)
-                    not_submitted_table.pack(side=LEFT, fill=BOTH, expand=True)
-                    
-                    not_submitted_scrollbar = ttk.Scrollbar(not_submitted_table_frame, orient=VERTICAL, command=not_submitted_table.yview)
-                    not_submitted_scrollbar.pack(side=RIGHT, fill=Y)
-                    not_submitted_table.configure(yscrollcommand=not_submitted_scrollbar.set)
-                    
-                    for subject in class_data["not_submitted_subjects"]:
-                        not_submitted_table.insert("", "end", values=(subject,))
-
-                    count_frame = ttk.Frame(class_frame)
-                    count_frame.pack(fill=X, expand=True)
-                    ttk.Label(count_frame, text=f"Submitted: {len(class_data['submitted_subjects'])}", font=("Helvetica", 9)).pack(side=LEFT, padx=5)
-                    ttk.Label(count_frame, text=f"Not Submitted: {len(class_data['not_submitted_subjects'])}", font=("Helvetica", 9)).pack(side=RIGHT, padx=5)
-
-                    class_row += 1
-
-                row += 1
-
-        self.canvas_frame.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                col += 1
+                if col > 1:
+                    col = 0
+                    row += 1
 
     def reset_filters(self):
         self.year_var.set('')
@@ -345,8 +326,12 @@ class NotSubmitted:
     def print_report(self):
         createPDF(self.CURRENT_RESULTS)
         messagebox.showinfo("Report", "Report printed successfully")
+        
+
+
 
     def get_efficient_assessment_status(self, year=None, semester=None, class_name=None):
+        # Get the class_id if class_name is provided
         class_id = None
         if class_name:
             conn = get_db_connection()
@@ -357,34 +342,30 @@ class NotSubmitted:
                 class_id = result['id']
             conn.close()
 
+        # Get assessment submission status
         submissions = get_assessment_submission_status(year, semester, class_id)
 
+        # Process the results
         programmes = {}
         for submission in submissions:
             programme_name = submission['programme_name']
-            class_name = submission['class_name']
             subject_name = submission['subject_name']
             status = submission['submission_status']
 
             if programme_name not in programmes:
                 programmes[programme_name] = {
                     "programme_name": programme_name,
-                    "programme_id": None,
-                    "classes": {}
-                }
-
-            if class_name not in programmes[programme_name]["classes"]:
-                programmes[programme_name]["classes"][class_name] = {
-                    "class_name": class_name,
-                    "submitted_subjects": set(),
-                    "not_submitted_subjects": set()
+                    "programme_id": None,  # This will be set later
+                    "existing_subjects": set(),
+                    "not_existing_subjects": set()
                 }
 
             if status == 'Submitted':
-                programmes[programme_name]["classes"][class_name]["submitted_subjects"].add(subject_name)
+                programmes[programme_name]["existing_subjects"].add(subject_name)
             else:
-                programmes[programme_name]["classes"][class_name]["not_submitted_subjects"].add(subject_name)
+                programmes[programme_name]["not_existing_subjects"].add(subject_name)
 
+        # Get programme IDs
         conn = get_db_connection()
         cursor = conn.cursor()
         for programme_name in programmes:
@@ -394,21 +375,17 @@ class NotSubmitted:
                 programmes[programme_name]["programme_id"] = result['id']
         conn.close()
 
+        # Convert sets to lists and create final output
         result = []
         for programme in programmes.values():
-            programme["classes"] = [
-                {
-                    "class_name": class_data["class_name"],
-                    "submitted_subjects": list(class_data["submitted_subjects"]),
-                    "not_submitted_subjects": list(class_data["not_submitted_subjects"])
-                }
-                for class_data in programme["classes"].values()
-            ]
+            programme["existing_subjects"] = list(programme["existing_subjects"])
+            programme["not_existing_subjects"] = list(programme["not_existing_subjects"])
             result.append(programme)
 
         return result
 
+
 if __name__ == "__main__":
-    root = ttk.Window("Assessment Submission Status", "darkly")
+    root = ttk.Window("Subject List", "darkly")
     app = NotSubmitted(root)
     root.mainloop()
