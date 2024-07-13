@@ -12,6 +12,7 @@ import SendSMSToParents
 import sms_report
 import GS
 import threading
+import AE
 
 from GS import get_preferred_class
 
@@ -129,7 +130,7 @@ class SMS:
 
         ttk.Label(left_column, text="Year:", font=label_font).grid(row=1, column=0, padx=entry_padding_x, pady=entry_padding_y, sticky=E)
         self.year_var = ttk.StringVar()
-        self.year_select = ttk.Combobox(left_column, textvariable=self.year_var, values=self.generate_years())
+        self.year_select = ttk.Combobox(left_column, textvariable=self.year_var, values=AE.generate_years())
         self.year_select.grid(row=1, column=1, padx=entry_padding_x, pady=entry_padding_y, sticky=W)
         self.year_select.config(justify="center")
         self.year_select.bind("<<ComboboxSelected>>", self.update_suggested_table)
@@ -209,6 +210,20 @@ class SMS:
         self.update_suggested_table()
 
         self.stop_flag = threading.Event()
+        
+        
+        
+                # Set default values based on preferred year and semester
+        preferred_values = AE.get_preferred_year_semester()
+        if "year" in preferred_values:
+            self.year_var.set(preferred_values["year"])
+        else:
+            self.year_var.set(AE.generate_years()[0])  # Set to the most recent year if no preference
+
+        if "semester" in preferred_values:
+            self.semester_var.set(preferred_values["semester"])
+        else:
+            self.semester_var.set("1")  # Set to "1" if no preference
        
     def generate_years(self):
         current_year = datetime.datetime.now().year

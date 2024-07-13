@@ -11,6 +11,7 @@ import pandas as pd
 import re
 from ass import *
 import LCS
+import AE
 from THREAD import *
 from set_class import SetClass
 from GS import get_preferred_class
@@ -55,7 +56,7 @@ class LoadAssessment:
 
         ttk.Label(self.frame, text="Select Year:", font=label_font).grid(row=0, column=0, padx=entry_padding_x, pady=entry_padding_y, sticky=E)
         self.year_var = ttk.StringVar()
-        self.year_select = ttk.Combobox(self.frame, textvariable=self.year_var, values=self.generate_years())
+        self.year_select = ttk.Combobox(self.frame, textvariable=self.year_var, values=AE.generate_years())
         self.year_select.grid(row=0, column=1, padx=entry_padding_x, pady=entry_padding_y, sticky=W)
         self.year_select.config(justify="center")
         self.year_select.bind("<<ComboboxSelected>>", self.on_combobox_select)
@@ -84,6 +85,29 @@ class LoadAssessment:
         self.semester_select.grid(row=1, column=3, padx=entry_padding_x, pady=entry_padding_y, sticky=W)
         self.semester_select.config(justify="center")
         self.semester_select.bind("<<ComboboxSelected>>", self.on_combobox_select)
+        
+        
+                # Set default values based on preferred year and semester
+        preferred_values = AE.get_preferred_year_semester()
+        if "year" in preferred_values:
+            self.year_var.set(preferred_values["year"])
+        else:
+            self.year_var.set(AE.generate_years()[0])  # Set to the most recent year if no preference
+
+        if "semester" in preferred_values:
+            self.semester_var.set(preferred_values["semester"])
+        else:
+            self.semester_var.set("1")  # Set to "1" if no preference
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
         ttk.Label(self.frame, text="Teacher Initials:", font=label_font).grid(row=2, column=0, padx=entry_padding_x, pady=entry_padding_y, sticky=E)
         self.teacher_initial_letters_var = ttk.StringVar()
@@ -152,11 +176,14 @@ class LoadAssessment:
         def run_calculation():
             compute_and_store_assessments()
             LCS.delete_invalid_assessment_records()
-            with multiprocessing.Pool(processes=3) as pool:
-                pool.apply_async(LCS.update_student_programme())
-                pool.apply_async(LCS.reset_guardian_title())
-                pool.close()
-                pool.join()
+            LCS.update_student_programme()
+            LCS.reset_guardian_title()
+            
+            # with multiprocessing.Pool(processes=3) as pool:
+            #     pool.apply_async()
+            #     pool.apply_async()
+            #     pool.close()
+            #     pool.join()
             
             self.root.after(0, self.finish_calculation)
         
@@ -182,13 +209,9 @@ class LoadAssessment:
         conn.close()
         return row['id'] if row else None
 
-    from datetime import datetime 
 
-    def generate_years(self):
-        current_year = datetime.now().year
-        start_year = 1991
-        end_year = current_year + 1
-        return [f"{year}/{year + 1}" for year in range(end_year, start_year - 1, -1)]
+
+
 
 
     def upload_file(self):

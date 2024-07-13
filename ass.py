@@ -38,8 +38,17 @@ def create_temp_table():
 def get_ordinal_suffix(number):
     if number is None or number == "":
         return "N/A"
+    # Try to convert to int if it's not already
     if not isinstance(number, int):
-        return str(number)
+        try:
+            number = int(float(number))  # Use float first to handle decimal strings
+        except ValueError:
+            return str(number)  # Return as-is if conversion fails
+    
+    # Handle negative numbers
+    if number < 0:
+        return f"-{get_ordinal_suffix(abs(number))}"
+    
     if number % 100 in {11, 12, 13}:
         return f"{number}th"
     return f"{number}{['th', 'st', 'nd', 'rd', 'th'][min(number % 10, 4)]}"
@@ -96,6 +105,7 @@ def delete_all_from_computed_assessment():
     conn.commit()
     conn.close()
 def compute_and_store_assessments():
+  
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -220,11 +230,15 @@ def compute_and_store_assessments():
             ''', (student_id, class_id, semester_id, subject['subject_id'], year, programme_id,
                   subject['class_score'], subject['exam_score'], subject_total_score, grade,
                   number_equivalence, remarks, subject['isCore'], subject['teacher_initial_letters'],
-                  subject['short_name'], subject['rank']))
-
+                  subject['short_name'], get_ordinal_suffix(subject['rank'])))
+            
     conn.commit()
-    print("Assessment computation and storage completed.")
-    conn.close() 
+    conn.close()
+    print("Computation and storage complete.")
+    return True
+
+
+
 def get_student_aggregate(student_id, class_id, semester_id, year):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -271,16 +285,11 @@ def get_student_aggregate(student_id, class_id, semester_id, year):
     elective_subjects = sorted(elective_subjects)
     # Select the scores for MATH, SCI, ENG
     best_3_core = [core_subjects[subject] for subject in [abbreMath, abbreSci, abbreEng]]
-    # Sort and select the top 3 elective subjects
+    # Ensure there are at least 3 elective subjects, filling with 9s if necessary
+    while len(elective_subjects) < 3:
+        elective_subjects.append(9)
+    # Select the top 3 elective subjects
     best_3_elective = elective_subjects[:3]
-            
-    # if student_id == "BB1460":
-    #     print("Core Subjectsxxxxx:", core_subjects)
-    #     print("Elective Subjectsxx:", elective_subjects)
-    #     # show the best 3 core subjects
-    #     print("Best 3 Core Subjects:", best_3_core)
-    #     # show the best 3 elective subjects
-    #     print("Best 3 Elective Subjects:", best_3_elective)
     
     aggregate = sum(best_3_core) + sum(best_3_elective)
     aggregate = round(aggregate, 1)
@@ -289,7 +298,6 @@ def get_student_aggregate(student_id, class_id, semester_id, year):
     
     cursor.execute('SELECT name FROM student WHERE student_id = ?', (student_id,))
     student_name = cursor.fetchone()['name']
-    #print(f"Aggregate for student id and name {student_id} - {student_name} is {aggregate}")
     
     # Print all grades for the core subjects
     for subject, grade in core_subjects.items():
@@ -312,7 +320,6 @@ def get_student_aggregate(student_id, class_id, semester_id, year):
                 grade_letter = "E8"
             else:
                 grade_letter = "F9"
-            #print(f"{subject}: [{grade_letter}, {grade}]")
     
     conn.close()
     return aggregate

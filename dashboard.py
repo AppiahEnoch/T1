@@ -24,6 +24,7 @@ import LCS
 from THREAD import *
 from set_class import SetClass
 import signature
+from set_year import SetYearSemester
 
 
 class Dashboard:
@@ -55,6 +56,18 @@ class Dashboard:
         container.grid_rowconfigure(4, weight=1)  # Added another row for the new button
         container.grid_rowconfigure(5, weight=1)  # Added another row for the new button
         container.grid_rowconfigure(6, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(7, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(8, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(9, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(10, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(11, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(12, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(13, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(14, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(15, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(16, weight=1)  # Added another row for the new button
+ 
+        
 
         # Define a style for the buttons
         style = ttk.Style()
@@ -112,9 +125,15 @@ class Dashboard:
         button14 = ttk.Button(container, text="Change Student Class", style="Dashboard.TButton", command=self.open_change_class)
         button14.grid(row=8, column=0, padx=padx_value, pady=pady_value, sticky="nsew")
         
-        # set the button to close the window
+    
         button15 = ttk.Button(container, text="Pref Class", style="Dashboard.TButton", command=self.open_set_class)
         button15.grid(row=8, column=1, padx=padx_value, pady=pady_value, sticky="nsew")
+        # set my default  year and semester button
+        button16 = ttk.Button(container, text="Pref. year and semester", style="Dashboard.TButton", command=self.open_set_year)
+        button16.grid(row=9, column=0, padx=padx_value, pady=pady_value, sticky="nsew")
+        
+ 
+        
         
   
         
@@ -124,6 +143,9 @@ class Dashboard:
     def open_load_assessment(self):
         new_window = ttk.Toplevel(self.root)
         LoadAssessment(new_window)
+    def open_set_year(self):
+        new_window = ttk.Toplevel(self.root)
+        SetYearSemester(new_window)
         
     def open_change_class(self):
         new_window = ttk.Toplevel(self.root)
@@ -212,7 +234,7 @@ if __name__ == "__main__":
   
    
     
-    root.geometry("800x600")
+    root.geometry("800x650")
     dashboard = Dashboard(root, None)
     dashboard.show()
     root.mainloop()

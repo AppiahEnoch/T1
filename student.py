@@ -23,6 +23,7 @@ import db
 from GS import get_preferred_class
 import multiprocessing
 import LCS
+import AE
 class SafeMultiprocessingUpdate:
     def __init__(self):
         self.process = None
@@ -86,7 +87,7 @@ class Student:
             row=0, column=2, padx=entry_padding_x, pady=entry_padding_y, sticky=ttk.W
         )
         self.year_var = ttk.StringVar()
-        self.year_select = ttk.Combobox(self.frame, textvariable=self.year_var, values=self.generate_years())
+        self.year_select = ttk.Combobox(self.frame, textvariable=self.year_var, values=AE.generate_years())
         self.year_select.grid(row=1, column=2, columnspan=2, padx=entry_padding_x, pady=entry_padding_y, sticky=ttk.W)
         self.year_select.config(justify="center")
         self.year_select.bind("<<ComboboxSelected>>", self.on_combobox_select)
@@ -214,6 +215,15 @@ class Student:
         self.frame.grid_columnconfigure(5, weight=1)
 
         self.update_table()
+        
+        
+        # Set default values based on preferred year and semester
+        preferred_values = AE.get_preferred_year_semester()
+        if "year" in preferred_values:
+            self.year_var.set(preferred_values["year"])
+        else:
+            self.year_var.set(AE.generate_years()[0])  # Set to the most recent year if no preference
+
 
     def on_combobox_select(self, event):
         #reset all values 

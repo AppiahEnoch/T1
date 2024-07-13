@@ -18,6 +18,9 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row  # Enable access by column name
     return conn
 
+
+
+
 def initialize_database():
  
     """Initialize the database with the required tables."""
@@ -1373,14 +1376,49 @@ def create_indexes():
 # Call this function to create the indexes
 
 
+
+
 def alter_assessment_table():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    # Rename the existing assessment table
-    cursor.execute('ALTER TABLE assessment RENAME TO old_assessment')
+        # Check if the assessment table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='assessment'")
+        if not cursor.fetchone():
+            print("Assessment table does not exist. Creating new table.")
+            create_new_assessment_table(cursor)
+        else:
+            # Rename the existing assessment table
+            cursor.execute("ALTER TABLE assessment RENAME TO assessment_old")
 
-    # Create the new assessment table with the last_updated column
+            # Create the new assessment table
+            create_new_assessment_table(cursor)
+
+            # Copy data from the old table to the new table
+            cursor.execute('''
+                INSERT INTO assessment (student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters)
+                SELECT student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters
+                FROM assessment_old
+            ''')
+
+            # Drop the old assessment table
+            cursor.execute("DROP TABLE assessment_old")
+
+        conn.commit()
+        print("Assessment table altered successfully to add last_updated column.")
+
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+        print(f"An error occurred: {e}")
+
+    finally:
+        if conn:
+            conn.close()
+
+def create_new_assessment_table(cursor):
     cursor.execute('''
         CREATE TABLE assessment (
             student_id INTEGER NOT NULL,
@@ -1400,20 +1438,6 @@ def alter_assessment_table():
         )
     ''')
 
-    # Copy data from the old assessment table to the new assessment table
-    cursor.execute('''
-        INSERT INTO assessment (student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters)
-        SELECT student_id, semester_id, programme_id, subject_id, class_id, year, class_score, exam_score, teacher_initial_letters
-        FROM old_assessment
-    ''')
-
-    # Drop the old assessment table
-    cursor.execute('DROP TABLE old_assessment')
-
-    conn.commit()
-    conn.close()
-
-    print("Assessment table altered to add last_updated column.")
 
 # Function to create the assessment table if it doesn't exist
 def create_assessment_table():
@@ -1552,6 +1576,7 @@ if getVersion() == 1:
     CPS.insert_class_programme_subject()
     CPS.includeCoreSubjectsIntoProgramme_subject()
     CPS.includeCoreSubjectsIntoClassProgrammeSubject()
+    
 
 
 

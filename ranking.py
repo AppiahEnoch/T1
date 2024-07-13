@@ -16,6 +16,9 @@ from openpyxl.styles import Font, Alignment, Side, Border
 from ass import *
 from GS import get_preferred_class
 
+
+import AE
+
 class Ranking:
     def __init__(self, root):
         self.root = root
@@ -75,6 +78,20 @@ class Ranking:
         self.reset_button.pack(side=ttk.LEFT, padx=button_padding_x)
 
         self.exam_title_var.set(self.getTitle())
+        
+        
+        
+                # Set default values based on preferred year and semester
+        preferred_values = AE.get_preferred_year_semester()
+        if "year" in preferred_values:
+            self.year_var.set(preferred_values["year"])
+        else:
+            self.year_var.set(AE.generate_years()[0])  # Set to the most recent year if no preference
+
+        if "semester" in preferred_values:
+            self.semester_var.set(preferred_values["semester"])
+        else:
+            self.semester_var.set("1")  # Set to "1" if no preference
 
     def generate_years(self):
         current_year = datetime.datetime.now().year
@@ -112,8 +129,8 @@ class Ranking:
         class_name = self.class_var.get()
         semester = self.semester_var.get()
 
-        if not exam_title or not year and not class_name and not semester:
-            messagebox.showerror("Error", "Please enter exam title and select at least one field.")
+        if not all([exam_title, year, class_name, semester]):
+            messagebox.showwarning("Warning", "Please select all options before downloading.")
             return
 
         self.setTitle(exam_title)

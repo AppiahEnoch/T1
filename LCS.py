@@ -295,3 +295,28 @@ def update_student_boarding_and_house():
     conn.commit()
     print("Student boarding status and house_id updated successfully.")
     conn.close()
+    
+    
+    
+def update__year_24():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Update year to '2023/2024' for all rows
+    cursor.execute('''
+        UPDATE assessment
+        SET year = '2023/2024'
+    ''')
+    
+    # Commit the changes
+    conn.commit()
+    
+    # Get the number of rows updated
+    rows_affected = cursor.rowcount
+    
+    print(f"Assessment year updated successfully. {rows_affected} rows affected.")
+    
+    conn.close()
+    
+    
+    

@@ -15,6 +15,7 @@ import sys
 from terminal_report import generate_student_report, getStudentProgram
 from ass import *
 from GS import get_preferred_class
+import AE
 
 HOME_DIR = os.path.expanduser('~')
 APP_DIR = os.path.join(HOME_DIR, 'SHSStudentReportSystem')
@@ -177,6 +178,18 @@ class Report:
 
         self.selected_student_label = ttk.Label(self.frame, text="", font=("Helvetica", 10), wraplength=400, justify=LEFT)
         self.selected_student_label.grid(row=1, column=2, padx=10, pady=5, sticky=ttk.W)
+        
+                # Set default values based on preferred year and semester
+        preferred_values = AE.get_preferred_year_semester()
+        if "year" in preferred_values:
+            self.year_var.set(preferred_values["year"])
+        else:
+            self.year_var.set(AE.generate_years()[0])  # Set to the most recent year if no preference
+
+        if "semester" in preferred_values:
+            self.semester_var.set(preferred_values["semester"])
+        else:
+            self.semester_var.set("1")  # Set to "1" if no preference
 
     def fetch_existing_data(self):
         conditions = []

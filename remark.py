@@ -8,6 +8,7 @@ from db import get_db_connection
 
 
 
+
 class Remark:
     def __init__(self, root):
         self.root = root
@@ -72,6 +73,10 @@ class Remark:
         self.tree.column("action", width=75, stretch=False)
 
         self.populate_remarks()
+        
+        
+        
+    
 
     def submit(self):
         mark_range = self.mark_range_var.get()
