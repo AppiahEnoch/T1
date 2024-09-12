@@ -114,6 +114,10 @@ def compute_and_store_assessments():
     columns = [col[1] for col in cursor.fetchall()]
     if 'programme_id' not in columns:
         cursor.execute('ALTER TABLE computed_assessment ADD COLUMN programme_id INTEGER')
+        
+    if 'last_updated' not in columns:
+        cursor.execute('ALTER TABLE computed_assessment ADD COLUMN last_updated TIMESTAMP')
+    
 
     # Fetch all records from assessment table that are not in computed_assessment or have been updated
     cursor.execute('''

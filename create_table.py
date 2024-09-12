@@ -627,6 +627,7 @@ def insert_programme_names():
     
     
     
+    
 
 
 
@@ -1554,6 +1555,36 @@ def delete_all_from_computed_assessment():
     cursor.execute('DELETE FROM computed_assessment')
     conn.commit()
     conn.close()
+    
+    
+def extract_programme_names(programme_names):
+    unique_programmes = set()
+    for name in programme_names:
+        programme = ' '.join(name.split()[:-1])
+        unique_programmes.add(programme)
+    return list(unique_programmes)
+
+def create_table_and_insert_programmes(programmes):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS programme (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        programme_name TEXT NOT NULL UNIQUE
+    )
+    ''')
+
+    # Insert programmes
+    for programme in programmes:
+        cursor.execute('INSERT OR IGNORE INTO programme (programme_name) VALUES (?)', (programme,))
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+
+
 
 
 if getVersion() == 1:

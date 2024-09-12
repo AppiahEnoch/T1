@@ -93,6 +93,41 @@ def get_preferred_class():
             return f"{number1} {programme} {number2}".strip()
     else:
         return None
+    
+    
+    
+    
+    
+def extract_unique_programme_names(programme_names):
+    unique_programmes = set()
+    for name in programme_names:
+        programme = ' '.join(name.split()[:-1])  # Remove the last word (assumed to be a number)
+        unique_programmes.add(programme)
+    return list(unique_programmes)
+
+def process_and_insert_unique_programmes():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Fetch existing programme names
+    cursor.execute("SELECT programme_name FROM programme")
+    existing_programmes = [row['programme_name'] for row in cursor.fetchall()]
+
+    # Process existing programmes to get unique names
+    unique_programmes = extract_unique_programme_names(existing_programmes)
+
+    # Insert unique programmes back into the table
+    for programme in unique_programmes:
+        cursor.execute('INSERT OR IGNORE INTO programme (programme_name) VALUES (?)', (programme,))
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+
+    return unique_programmes
+
+# Process and insert unique programmes
+unique_programmes = process_and_insert_unique_programmes()
 
 
 

@@ -27,6 +27,9 @@ import signature
 from set_year import SetYearSemester
 
 
+from delete_class_record import DeleteAllClassRecord
+
+
 class Dashboard:
     def __init__(self, root, main_controller):                                                                                                                                                                       
         self.root = root
@@ -66,6 +69,7 @@ class Dashboard:
         container.grid_rowconfigure(14, weight=1)  # Added another row for the new button
         container.grid_rowconfigure(15, weight=1)  # Added another row for the new button
         container.grid_rowconfigure(16, weight=1)  # Added another row for the new button
+        container.grid_rowconfigure(17, weight=1)  # Added another row for the new button
  
         
 
@@ -131,6 +135,10 @@ class Dashboard:
         # set my default  year and semester button
         button16 = ttk.Button(container, text="Pref. year and semester", style="Dashboard.TButton", command=self.open_set_year)
         button16.grid(row=9, column=0, padx=padx_value, pady=pady_value, sticky="nsew")
+        #DELETE ALL CLASS RECORD BUTTON
+        button17 = ttk.Button(container, text="Delete All Class Records", style="Dashboard.TButton", command=self.open_delete_all_class_record)
+        button17.grid(row=9, column=1, padx=padx_value, pady=pady_value, sticky="nsew")
+        
         
  
         
@@ -143,6 +151,12 @@ class Dashboard:
     def open_load_assessment(self):
         new_window = ttk.Toplevel(self.root)
         LoadAssessment(new_window)
+        
+        
+    def open_delete_all_class_record(self):
+        new_window = ttk.Toplevel(self.root)
+        DeleteAllClassRecord(new_window)
+        
     def open_set_year(self):
         new_window = ttk.Toplevel(self.root)
         SetYearSemester(new_window)

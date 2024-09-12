@@ -49,7 +49,7 @@ def create_splash_screen():
     
     center_window(splash, 500, 200)
     
-    label = ttk.Label(splash, text="SDASS student Report system V1.8\nBy the IT Department-2024 \nLoading...\nPlease wait", font=("Helvetica", 16))
+    label = ttk.Label(splash, text="SDASS student Report system V1.7\nBy the IT Department-2024 \nLoading...\nPlease wait", font=("Helvetica", 16))
     label.pack(expand=True)
     
     return splash
@@ -95,7 +95,7 @@ def load_main_application(root, splash):
 if __name__ == "__main__":
     multiprocessing.freeze_support()  # Necessary for multiprocessing to work with PyInstaller
     
-    root = ttk.Window("SDASS STUDENT REPORT SYSTEM V1.8   --By  SDASS IT Department-2024", "darkly", resizable=(False, False))
+    root = ttk.Window("SDASS STUDENT REPORT SYSTEM V1.9   --By  SDASS IT Department-2024", "darkly", resizable=(False, False))
     
     # Hide the main window initially
     root.withdraw()
